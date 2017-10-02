@@ -79,6 +79,9 @@ class ascii_reader(dales_reader):
             tokens = [s for s in re.split("\(|\)|\[|\]",col)]
             self.variables.append(tokens[0])
             self.units.append(tokens[1] if len(tokens) > 1 else "1")
+        if("zf" in self.variables):
+            index = self.variables.index("zf")
+            self.variables[index] = "height"
         if("height" in self.variables):
             self.dimensions.append("height")
         self.data = numpy.loadtxt(self.filepath,comments = ascii_reader.commentchar).transpose()

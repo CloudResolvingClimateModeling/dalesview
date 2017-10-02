@@ -1,5 +1,5 @@
-import dalesdata
-import dataslice
+from dalesdata import dalesdata
+from dalesdata import dataslice
 import logging
 
 # DALES view object. Allows simple but easy plotting of dales data objects.
@@ -31,9 +31,9 @@ class dalesview(object):
             if(not include):
                 log.error("Variable %s could not be found in given DALES data directory %s" % (str(arg),self.data.path))
         if(not any(dataprovs)):
-            return self.plotapi.multiplot(dataproviders,kwargs) if not any(args) else None
+            return self.plotapi.multiplot(dataproviders,**kwargs) if not any(args) else None
         elif(len(dataprovs) == 1):
-            return self.plotapi.plot(dataprovs[0],kwargs)
+            return self.plotapi.plot(dataprovs[0],**kwargs)
         else:
             return self.plotapi.multiplot(list(set(dataprovs)),**kwargs)
 

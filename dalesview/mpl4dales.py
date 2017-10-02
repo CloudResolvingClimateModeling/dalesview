@@ -1,9 +1,8 @@
-import dalesdata
-import dataslice
 import logging
 import math
 import numpy
 import matplotlib.pyplot as plt
+from dalesdata import dataslice
 
 # Matplotlib plotting backend for dalesview.
 

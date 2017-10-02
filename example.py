@@ -2,8 +2,8 @@
 
 from __future__ import print_function
 import os
-import dalesdata
-import dalesview
+from dalesdata import dalesdata
+from dalesview import dalesview
 import logging
 
 # Basic example of what dalesviewer currently can do.

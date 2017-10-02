@@ -11,7 +11,7 @@ import dataslice
 class dalesdata(object):
 
     # Creates DALES data object for the given run directory and experiment number
-    def __init__(self,dalesdir,exp = 1):
+    def __init__(self,dalesdir = ".",exp = 1):
         if(not os.path.isdir(dalesdir)):
             raise Exception("Dales directory %s does not exist" % dalesdir)
         self.path = dalesdir
@@ -33,7 +33,7 @@ Output:
 class dalesinput(object):
 
     # Creates DALES input data object for the given run directory and experiment number
-    def __init__(self,dalesdir,exp = 1):
+    def __init__(self,dalesdir = ".",exp = 1):
         self.filereaders = []
         self.profiles = {}
         make_profiles(glob.glob(os.path.join(dalesdir,".".join(["*","inp",str(exp).zfill(3)]))),self.filereaders,self.profiles)
@@ -48,7 +48,7 @@ class dalesinput(object):
 class dalesoutput(object):
 
     # Creates DALES output data object for the given run directory and experiment number
-    def __init__(self,dalesdir,exp = 1):
+    def __init__(self,dalesdir = ".",exp = 1):
         self.filereaders = []
         self.profiles = {}
         self.timeseries = {}
