@@ -1,0 +1,56 @@
+&RUN
+iexpnr     =  001
+runtime    =  300
+dtmax      =  1.
+ladaptive  =  .false.
+irandom    =  43
+randthl    =  0.1
+randqt     =  0e-5
+/
+&DOMAIN
+itot       =  32 
+jtot       =  32
+kmax       =  128
+xsize      =  1600.
+ysize      =  1600.
+xlat       =  32.
+xlon       =  129.
+/
+&PHYSICS
+ps         =  101900.00
+thls       =  293.
+lcoriol    =  .true.
+iradiation = 0
+z0         = 0.1
+/
+&NAMSURFACE
+wtsurf     = 0.1 
+wqsurf     =  0e-5
+isurf      = 4
+/
+&DYNAMICS
+cu         =  1.
+cv         =  0.
+iadv_mom    =  2
+iadv_tke    =  2
+iadv_thl    =  2
+iadv_qt     =  2
+/
+&NAMSUBGRID
+ldelta      = .true.
+/
+&NAMCHECKSIM
+tcheck      = 5
+/
+&NAMTIMESTAT
+ltimestat   = .true.
+dtav        = 60
+/
+&NAMGENSTAT
+lstat       = .true.
+dtav        = 60
+timeav      = 300
+/
+&NAMNETCDFSTATS
+lnetcdf = .true.
+/
