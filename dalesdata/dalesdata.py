@@ -1,8 +1,8 @@
 import os
 import glob
 import logging
-import dalesreader
-import dataslice
+import dalesdata.dalesreader
+import dalesdata.dataslice
 
 # Data objects for the DALES view package. The objects contain dictionaries for
 # profiles and/or timeseries for all input and output of a given experiment.
