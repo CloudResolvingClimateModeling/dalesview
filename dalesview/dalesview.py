@@ -31,10 +31,13 @@ class dalesview(object):
             if(not include):
                 log.error("Variable %s could not be found in given DALES data directory %s" % (str(arg),self.data.path))
         if(not any(dataprovs)):
+            log.info("processing multiple plots")
             return self.plotapi.multiplot(dataproviders,**kwargs) if not any(args) else None
         elif(len(dataprovs) == 1):
+            log.info("processing single plot")
             return self.plotapi.plot(dataprovs[0],**kwargs)
         else:
+            log.info("processing multiple plots")
             return self.plotapi.multiplot(list(set(dataprovs)),**kwargs)
 
     # Factory method for creating the plotting backend. Currently only netcdf
@@ -42,7 +45,7 @@ class dalesview(object):
     @staticmethod
     def create_plotapi(backend_type):
         if(backend_type == dalesview.mpl):
-            import mpl4dales
+            import dalesview.mpl4dales as mpl4dales
             return mpl4dales.mpl4dales()
         else:
             log.error("Plotting backend type %s is not known" % str(backend_type))
