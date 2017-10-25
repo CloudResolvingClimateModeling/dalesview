@@ -9,8 +9,8 @@ import pandas
 
 '''Script to generate diagnostic comparison plots using measurement data as a reference. '''
 
-## select max height index for OIFS
-## select height indices belonging to pre-specified heights
+## DONE select max height index for OIFS
+## DONE select height indices belonging to pre-specified heights
 ## select timelevels for comparisons
 ## create movie of profiles: QT, QL, U, V
 
@@ -119,39 +119,48 @@ def two_x_scales(ax1, xaxis1, xaxis2, data1, data2, c1, c2, xlab1, xlab2, ylab, 
     
     return ax1, ax2
 
-
+# Fetching the data
 ## DALES/OIFS
-netcdf = Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/spifs/spifs_750_cabau.nc", "r") 
+base_location = "/home/bramiozo/" # C:/Users\Bram van Es/ /home/bramiozo/
+netcdf = Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/spifs/spifs_750_cabau.nc", "r") 
 ds = netcdf[list(netcdf.groups.keys())[0]]
 
 ## MEASUREMENTS
-meascdf = Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/dales/profiles.001.nc", "r")
+meascdf = Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/dales/profiles.001.nc", "r")
 ds_meas = meascdf[list()]
 
-measurements_meta = Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/cesar_tower_meteo_lb1_t10_v1.1_201204.nc", "r") 
+measurements_meta = Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/cesar_tower_meteo_lb1_t10_v1.1_201204.nc", "r") 
 measurements = []
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041312.nc", "r"))
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041412.nc", "r"))
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041512.nc", "r"))
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041612.nc", "r"))
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041712.nc", "r"))
-measurements.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041812.nc", "r"))
+measurements.append({'datestr': '13-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041312.nc", "r")})
+measurements.append({'datestr': '14-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041412.nc", "r")})
+measurements.append({'datestr': '15-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041512.nc", "r")})
+measurements.append({'datestr': '16-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041612.nc", "r")})
+measurements.append({'datestr': '17-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041712.nc", "r")})
+measurements.append({'datestr': '18-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041812.nc", "r")})
+measurements.append({'datestr': '19-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/scm_in.RACMO_Cabauw_2012041912.nc", "r")})
+
 
 measurements_rds = []
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120413.nc", "r"))
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120414.nc", "r"))
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120415.nc", "r"))
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120416.nc", "r"))
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120417.nc", "r"))
-measurements_rds.append(Dataset("C:/Users\Bram van Es/Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120418.nc", "r"))
+measurements_rds.append({'datestr': '13-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120413.nc", "r")})
+measurements_rds.append({'datestr': '14-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120414.nc", "r")})
+measurements_rds.append({'datestr': '15-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120415.nc", "r")})
+measurements_rds.append({'datestr': '16-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120416.nc", "r")})
+measurements_rds.append({'datestr': '17-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120417.nc", "r")})
+measurements_rds.append({'datestr': '18-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120418.nc", "r")})
+measurements_rds.append({'datestr': '19-04-2012','ds':Dataset(base_location+"Dropbox/eScience/data_analysis/data/cabau_750steps/meas/rds_DeBilt_20120419.nc", "r")})
 
 time_series = ds['time'][:]/3600/24
 Time_series = netcdf['Time'][:]/3600/24
 height_series = netcdf['zf'][:]
 Height_series = ds['Zf']
 
+meas_heights = [100, 200, 300, 1000, 2000, 3000, 4000] # heights used for comparison
+ref_heights = [numpy.argmin(numpy.abs(h-height_series)) for h in meas_heights]
+Ref_heights = [numpy.argmin(numpy.abs(h-Height_series[1])) for h in meas_heights]
+
+
 E = len(Height_series[1])-1
-B = 67
+B = numpy.argmin(numpy.abs(numpy.max(height_series)-Height_series[1]))
 numSteps = E - B +1
 oifs_range = list(numpy.linspace(E, B, numSteps).astype("int"))
 
@@ -161,130 +170,61 @@ for i in range(0, len(Time_series)):
     diff_Heights.append(-numpy.diff(numpy.hstack((Height_series[i], 0))))
     
 
+###
+profile_agg_OIFS = ['U', 'V', 'THL', 'f_SH', 'f_U', 'f_V', 'QT', 'QL', 'f_T', 
+                                'Pf', 'Ph', 'QI', 'Tv', 'T', 'Zf', 'Zh', 'SH']
+profile_agg_DALES = ['u', 'v', 'thl', 't_', 't', 'qt', 'ql', 'f_thl', 
+                                'f_qt', 'f_u', 'f_v', 'presf']
+xy_DALES = ['lwp', 'rwp', 'twp']
 
+## plot tuples
+profile_comparison = [('u', 'U'), ('v','V'), ('thl', 'THL'), ('qt','QT'), ('ql','QL'), 
+                     ('t','T'), ('f_u', 'f_U'), ('f_v', 'f_V'), ('presf','Pf')]
+
+profile_comparison_DALES_dual= [('f_thl', 'thl'), ('f_qt', 'qt')] # two vertical axes
+profile_comparison_OIFS_mono = [('Pf', 'Ph', 'Psurf')]
+profile_comparison_OIFS_dual = [('f_A', 'A')] # two vertical axes
+##
 ### generating aggregates
+##
+agg_time_series = {}
+for varname in profile_agg_DALES:
+    total_dales = []
+    for i in range(1, len(Time_series)):
+        total_dales.append({'timestep': i, 'total':sum(ds[varname][i][:])/len(ds[varname][i][:])})
+    agg_time_series[varname]= {'ts': pandas.DataFrame(data=total_dales)}
 
-total_t = []
-total_T = []
-for i in range(1, len(Time_series)):
-    total_t.append({'timestep': i, 'total':sum(netcdf['38062/t'][i][:])/len(netcdf['38062/t'][i][:])});
-t_total_df = pandas.DataFrame(data=total_t)
-for i in range(1, len(Time_series)):
-    total_T.append({'timestep': i, 'total':sum(netcdf['38062/T'][i][oifs_range])/len(netcdf['38062/T'][i][oifs_range])});
-T_total_df = pandas.DataFrame(data=total_T)
-####
-total_thl = []
-total_THL = []
-for i in range(1, len(Time_series)):
-    total_thl.append({'timestep': i, 'total':sum(netcdf['38062/thl'][i][:])/len(netcdf['38062/thl'][i][:])});
-thl_total_df = pandas.DataFrame(data=total_thl)
-for i in range(1, len(Time_series)):
-    total_THL.append({'timestep': i, 'total':sum(netcdf['38062/THL'][i][oifs_range])/len(netcdf['38062/THL'][i][oifs_range])});
-THL_total_df = pandas.DataFrame(data=total_THL)
-####
-total_qt = []
-total_QT = []
-for i in range(1, len(Time_series)):
-    total_qt.append({'timestep': i, 'total':sum(netcdf['38062/qt'][i][:])/len(netcdf['38062/qt'][i][:])});
-qt_total_df = pandas.DataFrame(data=total_qt)
-for i in range(1, len(Time_series)):
-    total_QT.append({'timestep': i, 'total':sum(netcdf['38062/QT'][i][oifs_range])/len(netcdf['38062/QT'][i][oifs_range])});
-QT_total_df = pandas.DataFrame(data=total_QT)
-####
-total_ql = []
-total_QL = []
-for i in range(1, len(Time_series)):
-    total_ql.append({'timestep': i, 'total':sum(netcdf['38062/ql'][i][:])});
-ql_total_df = pandas.DataFrame(data=total_ql)
-for i in range(1, len(Time_series)):
-    total_QL.append({'timestep': i, 'total':sum(netcdf['38062/QL'][i][oifs_range])});
-QL_total_df = pandas.DataFrame(data=total_QL)
-####
-total_v = []
-total_V = []
-for i in range(1, len(Time_series)):
-    total_v.append({'timestep': i, 'total':sum(netcdf['38062/v'][i][:])/len(netcdf['38062/v'][i][:])});
-v_total_df = pandas.DataFrame(data=total_v)
-for i in range(1, len(Time_series)):
-    total_V.append({'timestep': i, 'total':sum(netcdf['38062/V'][i][oifs_range])/len(netcdf['38062/V'][i][oifs_range])});
-V_total_df = pandas.DataFrame(data=total_V)
-#####
-total_u = []
-total_U = []
-for i in range(1, len(Time_series)):
-    total_u.append({'timestep': i, 'total':sum(netcdf['38062/u'][i][:])/len(netcdf['38062/u'][i][:])});
-u_total_df = pandas.DataFrame(data=total_u)
-for i in range(1, len(Time_series)):
-    total_U.append({'timestep': i, 'total':sum(netcdf['38062/U'][i][oifs_range])/len(netcdf['38062/U'][i][oifs_range])});
-U_total_df = pandas.DataFrame(data=total_U)
-####
-total_fthl = []
-total_fT = []
-for i in range(1, len(Time_series)):
-    total_fthl.append({'timestep': i, 'total':sum(netcdf['38062/f_thl'][i][:])/len(netcdf['38062/f_thl'][i][:])});
-fthl_total_df = pandas.DataFrame(data=total_fthl)
-for i in range(1, len(Time_series)):
-    total_fT.append({'timestep': i, 'total':sum(netcdf['38062/f_T'][i][oifs_range])/len(netcdf['38062/f_T'][i][oifs_range])});
-fT_total_df = pandas.DataFrame(data=total_fT)
-####
-total_fu = []
-total_fU = []
-for i in range(1, len(Time_series)):
-    total_fu.append({'timestep': i, 'total':sum(netcdf['38062/f_u'][i][:])/len(netcdf['38062/f_u'][i][:])});
-fu_total_df = pandas.DataFrame(data=total_fu)
-for i in range(1, len(Time_series)):
-    total_fU.append({'timestep': i, 'total':sum(netcdf['38062/f_U'][i][oifs_range])/len(netcdf['38062/f_U'][i][oifs_range])});
-fU_total_df = pandas.DataFrame(data=total_fU)
-####
-total_fv = []
-total_fV = []
-for i in range(1, len(Time_series)):
-    total_fv.append({'timestep': i, 'total':sum(netcdf['38062/f_v'][i][:])/len(netcdf['38062/f_v'][i][:])});
-fv_total_df = pandas.DataFrame(data=total_fv)
-for i in range(1, len(Time_series)):
-    total_fV.append({'timestep': i, 'total':sum(netcdf['38062/f_V'][i][oifs_range])/len(netcdf['38062/f_V'][i][oifs_range])});
-fV_total_df = pandas.DataFrame(data=total_fV)
-####
-total_fSH = []
-for i in range(1, len(Time_series)):
-    total_fSH.append({'timestep': i, 'total':sum(netcdf['38062/f_SH'][i][oifs_range])/len(netcdf['38062/f_SH'][i][oifs_range])});
-total_fSH_df = pandas.DataFrame(data=total_fSH)
+for varname in profile_agg_OIFS:
+    total_OIFS = []
+    for i in range(1, len(Time_series)):
+        total_OIFS.append({'timestep': i, 'total':sum(ds[varname][i][oifs_range])/len(ds[varname][i][oifs_range])})
+    agg_time_series[varname]= {'ts': pandas.DataFrame(data=total_OIFS)}
 
-total_fqt = []
-for i in range(1, len(Time_series)):
-    total_fqt.append({'timestep': i, 'total':sum(netcdf['38062/f_qt'][i])/len(netcdf['38062/f_qt'][i])});
-total_fqt_df = pandas.DataFrame(data=total_fqt)
-####
-total_A = []
-for i in range(1, len(Time_series)):
-    total_A.append({'timestep':i, 'Atot':sum(netcdf['38062/A'][i])})
-total_A_df =pandas.DataFrame(data=total_A)
+## Custom aggregation for LWP and TWP
 ####
 total_lw = []
 total_LW = []
 R = 8.3144621
 for i in range(1, len(Time_series)):
-    total_lw.append({'timestep': i, 'total':sum(netcdf['38062/ql'][i][:]*(netcdf['38062/presf'][i][:]/netcdf['38062/t'][i][:]/R)*diff_heights[:])});
-lw_total_df = pandas.DataFrame(data=total_lw)
+    total_lw.append({'timestep': i, 'total':sum(ds['ql'][i][:]*(ds['presf'][i][:]/ds['t'][i][:]/R)*diff_heights[:])});
+agg_time_series['lwp'] = {'ts': pandas.DataFrame(data=total_lw)}
 
 for i in range(1, len(Time_series)):
-    total_LW_2.append({'timestep': i, 'total':sum(netcdf['38062/QL'][i][oifs_range]*(netcdf['38062/Pf'][i][oifs_range]/netcdf['38062/T'][i][oifs_range]/R)*diff_Heights[i][oifs_range])});
-LW_total_df = pandas.DataFrame(data=total_LW)
+    total_LW_2.append({'timestep': i, 'total':sum(ds['QL'][i][oifs_range]*(ds['Pf'][i][oifs_range]/ds['T'][i][oifs_range]/R)*diff_Heights[i][oifs_range])});
+agg_time_series['LWP'] = {'ts': pandas.DataFrame(data=total_LW)}
+
 ####
 total_tw = []
 total_TW = []
 for i in range(1, len(Time_series)):
-    total_tw.append({'timestep': i, 'total':sum(netcdf['38062/qt'][i][:]*(netcdf['38062/presf'][i][:]/netcdf['38062/t'][i][:]/R)*diff_heights[:])});
-tw_total_df = pandas.DataFrame(data=total_tw)
+    total_tw.append({'timestep': i, 'total':sum(ds['qt'][i][:]*(ds['presf'][i][:]/ds['t'][i][:]/R)*diff_heights[:])});
+agg_time_series['twp'] = {'ts': pandas.DataFrame(data=total_tw)}
 
 for i in range(1, len(Time_series)):
-    total_TW.append({'timestep': i, 'total':sum(netcdf['38062/QT'][i][oifs_range]*(netcdf['38062/Pf'][i][oifs_range]/netcdf['38062/T'][i][oifs_range]/R)*diff_Heights[i][oifs_range])});
-TW_total_df = pandas.DataFrame(data=total_TW)
+    total_TW.append({'timestep': i, 'total':sum(ds['QT'][i][oifs_range]*(ds['Pf'][i][oifs_range]/ds['T'][i][oifs_range]/R)*diff_Heights[i][oifs_range])});
+agg_time_series['TWP'] = {'ts': pandas.DataFrame(data=total_TW)}
 ####
-ref_heights = [0, 4, 8, 12, 40, 80, 120, 159]
-height_series[ref_heights]
-Ref_heights = [90, 87, 85, 84, 78, 73, 70, 67]
-Height_series[2][Ref_heights]
+
 
 
 
