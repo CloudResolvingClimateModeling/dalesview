@@ -61,9 +61,9 @@ class DalesOutput(object):
         netcdfiles = glob.glob(os.path.join(dalesdir, ".".join(["*", expstr, "nc"])))
         outputfiles = list(set(asciifiles) - set(inputfiles)) + netcdfiles
         # we only support netcdf output for now
-        timseriesfiles = [f for f in outputfiles if os.path.basename(f).startswith("tms")]
+        timseriesfiles = [f for f in outputfiles if os.path.basename(f).startswith("tmser")]
         make_timeseries([f for f in timseriesfiles if f in netcdfiles], self.filereaders, self.timeseries)
-        profilefiles = list(set(outputfiles) - set(timseriesfiles))
+        profilefiles = [f for f in outputfiles if os.path.basename(f).startswith("profiles")]
         make_profiles([f for f in profilefiles if f in netcdfiles], self.filereaders, self.profiles)
 
     def __str__(self):
