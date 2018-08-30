@@ -107,16 +107,17 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
                 for varname, vardata in ds.variables.items():
                     if varname == "time" or (time_indices[varname] < 0 and i > 0):
                         continue
+                    time_index = time_indices[varname]
                     axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
-                    if time_indices[varname] >= 0:
-                        values = numpy.asarray(vardata).take(indices=i, axis=time_indices[varname])
+                    if time_index >= 0:
+                        values = vardata[...].take(indices=i, axis=time_index)
+                        axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if time_index < axes[1] else axes[1])
                     else:
                         values = vardata[...]
                     copy_xy_block(time_slices[varname], values, key, axes)
         for varname, vardata in time_slices.items():
             if time_indices[varname] < 0 and i > 0:
                 continue
-            print varname, dst_vars[varname].shape, time_slices[varname].shape
             if time_indices[varname] == 0:
                 dst_vars[varname][i, :] = time_slices[varname]
             elif time_indices[varname] < 0:
@@ -132,12 +133,12 @@ def copy_xy_block(dest, src, key, axes):
     slices = []
     for i in range(len(dest.shape)):
         found_in_axes = False
-        for j in range(len(axes)):
+        for j in (0, 1):
             if i == axes[j]:
-                slices.append(slice(start=key[j] * src.shape[j], stop=(key[j] + 1) * src.shape[j]))
+                slices.append(slice(key[j] * src.shape[i], (key[j] + 1) * src.shape[i], 1))
                 found_in_axes = True
         if not found_in_axes:
-            slices.append(slice(start=0, stop=dest.shape[i]))
+            slices.append(slice(0, dest.shape[i], 1))
     dest[tuple(slices)] = src[...]
 
 
