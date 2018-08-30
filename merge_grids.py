@@ -68,6 +68,10 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
             src = datasets[k]
     dst.setncatts(src.__dict__)
 
+    #    num_steps = len(src.dimensions["time"])
+    num_steps = 20
+    dt = 10
+
     # Copy and extend spatial dimensions
     dst_dims = {s: 0 for s in src.dimensions.keys() if not src.dimensions[s].isunlimited()}
     for i in dims1:
@@ -90,13 +94,12 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
         time_indices[name] = match_dim_character(name, variable, "time")
         if name != "time":
             shape = [dst_dims[d] for d in variable.dimensions if d in dst_dims]
+            if time_indices[name] == 0 and dt > 1:
+                shape = [dt] + shape
             time_slices[name] = numpy.full(shape=shape, dtype=numpy.float64, fill_value=numpy.NaN)
 
-    #    num_steps = len(src.dimensions["time"])
-    num_steps = 20
-    chunk_size = 10
 
-    for i in range(num_steps):  # loop over t
+    for i in range(0, num_steps, dt):  # loop over t
         print "processing time step", i, "of", num_steps
         for j in dims2:  # loop over y
             for k in dims1:  # loop over x
@@ -110,8 +113,9 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
                     time_index = time_indices[varname]
                     axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
                     if time_index >= 0:
-                        values = vardata[...].take(indices=i, axis=time_index)
-                        axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if time_index < axes[1] else axes[1])
+                        values = vardata[...].take(indices=tuple(range(i, i + dt)), axis=time_index)
+                        if dt == 1:
+                            axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if time_index < axes[1] else axes[1])
                     else:
                         values = vardata[...]
                     copy_xy_block(time_slices[varname], values, key, axes)
@@ -119,13 +123,13 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
             if time_indices[varname] < 0 and i > 0:
                 continue
             if time_indices[varname] == 0:
-                dst_vars[varname][i, :] = time_slices[varname]
+                dst_vars[varname][i:(i + dt), :] = time_slices[varname]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
             else:
                 raise NotImplementedError("Time dimensions should come first")
-        if i % chunk_size == 0:
-            dst.sync()
+#        if i % chunk_size == 0:
+#            dst.sync()
     dst.close()
 
 
