@@ -71,10 +71,6 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
             src = datasets[k]
     dst.setncatts(src.__dict__)
 
-    #    num_steps = len(src.dimensions["time"])
-    num_steps = 20
-    dt = 10
-
     # Copy and extend spatial dimensions
     dst_dims = {s: 0 for s in src.dimensions.keys() if not src.dimensions[s].isunlimited()}
     for i in dims1:
@@ -87,12 +83,22 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
     for name, dim in src.dimensions.items():
         dst.createDimension(name, (dst_dims[name] if not dim.isunlimited() else None))
     if any(level_list):
-        dst.createDimension('z', len(level_list))
+        dst.createDimension('lev', len(level_list))
+
+    num_steps = len(src.dimensions["time"])
+    dt = 10
 
     # Copy variables
     dst_vars, time_indices, time_slices = {}, {}, {}
     for name, variable in src.variables.items():
-        dst_vars[name] = dst.createVariable(name, variable.datatype, variable.dimensions)
+        if any(level_list) and variable.dimensions != name: # Skip axes
+            if variable.dimensions[0] == "time":
+                dims = ("time", "lev", variable.dimensions[1:])
+            else:
+                dims = ("lev", variable.dimensions[:])
+        else:
+            dims = variable.dimensions
+        dst_vars[name] = dst.createVariable(name, variable.datatype, dims)
         dst_vars[name].setncatts(src.variables[name].__dict__)
         time_indices[name] = match_dim_character(name, variable, "time")
         if time_indices[name] > 0:
@@ -100,47 +106,52 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
             continue
         if name != "time":
             shape = [dst_dims[d] for d in variable.dimensions if d in dst_dims]
+            if any(level_list):
+                shape = [len(level_list)] + shape
             if time_indices[name] == 0 and dt > 1:
                 shape = [dt] + shape
             time_slices[name] = numpy.full(shape=shape, dtype=numpy.float64, fill_value=numpy.NaN)
 
-    #    num_steps = len(src.dimensions["time"])
-    num_steps = 20
-    chunk_size = 10
-
     for i in range(0, num_steps, dt):  # loop over t
-        dst_vars["time"][i] = src.variables["time"][i]
+        istart, iend = i, min(i + dt, num_steps)
+        dst_vars["time"][i:iend] = src.variables["time"][i:iend]
         print "processing time step", i, "of", num_steps
-        for j in dims2:  # loop over y
-            for k in dims1:  # loop over x
-                if k == 0:
-                    continue
-                key = (k, j) if not any(level_list) else (k, j, level_list[0])
-                ds = datasets[key]
-                for varname, vardata in ds.variables.items():
-                    if varname not in time_slices or (time_indices[varname] < 0 and i > 0):
+        levs = [-1] if not any(level_list) else level_list
+        for lev in levs:
+            for j in dims2:  # loop over y
+                for k in dims1:  # loop over x
+                    if k == 0:
                         continue
-                    time_index = time_indices[varname]
-                    axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
-                    if time_index >= 0:
-                        values = vardata[...].take(indices=tuple(range(i, i + dt)), axis=time_index)
-                        if dt == 1:
-                            axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if time_index < axes[1] else axes[1])
-                    else:
-                        values = vardata[...]
-                    copy_xy_block(time_slices[varname], values, key, axes)
+                    key = (k, j) if not any(level_list) else (k, j, lev)
+                    ds = datasets[key]
+                    for varname, vardata in ds.variables.items():
+                        if varname not in time_slices or (time_indices[varname] < 0 and i > 0):
+                            continue
+                        time_index = time_indices[varname]
+                        axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
+                        if time_index >= 0:
+                            values = vardata[...].take(indices=tuple(range(istart, iend)), axis=time_index)
+                            if dt == 1:
+                                axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if
+                                        time_index < axes[1] else axes[1])
+                        else:
+                            values = vardata[...]
+                        multi_index = key
+                        if any(level_list):
+                            axes = (axes[0] + 1, axes[1] + 1, 0)
+                            multi_index = (key[0], key[1], level_list.index(lev))
+                        if any(level_list) and "lev" in dst_vars[varname].dimensions:
+                            copy_xyz_block(time_slices[varname], values, multi_index, axes)
+                        else:
+                            copy_xy_block(time_slices[varname], values, multi_index, axes)
         for varname, vardata in time_slices.items():
             if time_indices[varname] < 0 and i > 0:
                 continue
             print varname, dst_vars[varname].shape, time_slices[varname].shape
             if time_indices[varname] == 0:
-                dst_vars[varname][i:(i + dt), :] = time_slices[varname]
+                dst_vars[varname][istart:iend, :] = time_slices[varname]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
-            else:
-                raise NotImplementedError("Time dimensions should come first")
-#        if i % chunk_size == 0:
-#            dst.sync()
     dst.close()
 
 
@@ -149,6 +160,19 @@ def copy_xy_block(dest, src, key, axes):
     for i in range(len(dest.shape)):
         found_in_axes = False
         for j in (0, 1):
+            if i == axes[j]:
+                slices.append(slice(key[j] * src.shape[i], (key[j] + 1) * src.shape[i], 1))
+                found_in_axes = True
+        if not found_in_axes:
+            slices.append(slice(0, dest.shape[i], 1))
+    dest[tuple(slices)] = src[...]
+
+
+def copy_xyz_block(dest, src, key, axes):
+    slices = []
+    for i in range(len(dest.shape)):
+        found_in_axes = False
+        for j in (0, 1, 2):
             if i == axes[j]:
                 slices.append(slice(key[j] * src.shape[i], (key[j] + 1) * src.shape[i], 1))
                 found_in_axes = True
