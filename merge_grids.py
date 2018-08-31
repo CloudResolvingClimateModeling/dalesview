@@ -17,7 +17,7 @@ def find_xsec(data_dir, expnr, s1, s2):
     file_mapping_2d, file_mapping_3d = {}, {}
     for filepath in os.listdir(data_dir):
         if re.match(regex2d, os.path.basename(filepath)):
-            result = re.search(regex3d, os.path.basename(filepath))
+            result = re.search(regex2d, os.path.basename(filepath))
             key = (int(result.group(1)), int(result.group(2)))
             file_mapping_2d[key] = os.path.join(data_dir, filepath)
         elif re.match(regex3d, os.path.basename(filepath)):
@@ -61,7 +61,7 @@ def match_dim_character(varname, ncvar, s):
 
 
 def build_xsec(dims1, dims2, level_list, file_mapping):
-    dst = netCDF4.Dataset("new.nc", 'w')
+    dst = netCDF4.Dataset("crossyz.nc", 'w')
 
     # Copy attributes
     datasets, src = {}, None
@@ -73,6 +73,9 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
 
     # Copy and extend spatial dimensions
     dst_dims = {s: 0 for s in src.dimensions.keys() if not src.dimensions[s].isunlimited()}
+    for name in dst_dims.keys():
+        if not name.startswith('x') and not name.startswith('y'):
+            dst_dims[name] = len(src.dimensions[name])
     for i in dims1:
         for j in dims2:
             key = (i, j) if not any(level_list) else (i, j, level_list[0])
@@ -83,19 +86,24 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
     for name, dim in src.dimensions.items():
         dst.createDimension(name, (dst_dims[name] if not dim.isunlimited() else None))
     if any(level_list):
-        dst.createDimension('lev', len(level_list))
+        levdim =  dst.createDimension("lev", len(level_list))
+        dst_dims["lev"] =  len(levdim)
 
-    num_steps = len(src.dimensions["time"])
+    #num_steps = len(src.dimensions["time"])
+    num_steps = 100
     dt = 10
 
     # Copy variables
+    if any(level_list):
+        levvar =  dst.createVariable("lev", numpy.float64, ("lev"))
+        levvar[:] = numpy.array(level_list)
     dst_vars, time_indices, time_slices = {}, {}, {}
     for name, variable in src.variables.items():
-        if any(level_list) and variable.dimensions != name: # Skip axes
+        if any(level_list) and variable.dimensions != (name,): # Skip axes
             if variable.dimensions[0] == "time":
-                dims = ("time", "lev", variable.dimensions[1:])
+                dims = ("time", "lev") + variable.dimensions[1:]
             else:
-                dims = ("lev", variable.dimensions[:])
+                dims = ("lev",) + variable.dimensions[:]
         else:
             dims = variable.dimensions
         dst_vars[name] = dst.createVariable(name, variable.datatype, dims)
@@ -105,79 +113,76 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
             log.error("Variable %s has non-major time index at %d... skipping variable" % (name, time_indices[name]))
             continue
         if name != "time":
-            shape = [dst_dims[d] for d in variable.dimensions if d in dst_dims]
-            if any(level_list):
-                shape = [len(level_list)] + shape
+            shape = [dst_dims[d] for d in dims if d in dst_dims]
             if time_indices[name] == 0 and dt > 1:
-                shape = [dt] + shape
+                if dims[1] == "lev":
+                    shape.insert(1, dt)
+                else:
+                    shape.insert(0, dt)
+#            print name, shape
             time_slices[name] = numpy.full(shape=shape, dtype=numpy.float64, fill_value=numpy.NaN)
 
     for i in range(0, num_steps, dt):  # loop over t
         istart, iend = i, min(i + dt, num_steps)
         dst_vars["time"][i:iend] = src.variables["time"][i:iend]
-        print "processing time step", i, "of", num_steps
+        log.info("processing time step %d of %d...", i, num_steps)
         levs = [-1] if not any(level_list) else level_list
-        for lev in levs:
+        for lev in levs: # loop over levels
             for j in dims2:  # loop over y
                 for k in dims1:  # loop over x
-                    if k == 0:
-                        continue
                     key = (k, j) if not any(level_list) else (k, j, lev)
                     ds = datasets[key]
                     for varname, vardata in ds.variables.items():
                         if varname not in time_slices or (time_indices[varname] < 0 and i > 0):
                             continue
+                        if time_indices[varname] == 0 and len(ds.dimensions["time"]) == 0:
+                            continue
                         time_index = time_indices[varname]
                         axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
                         if time_index >= 0:
+#                            print varname, vardata.shape, key
                             values = vardata[...].take(indices=tuple(range(istart, iend)), axis=time_index)
                             if dt == 1:
                                 axes = (axes[0] - 1 if time_index < axes[0] else axes[0], axes[1] - 1 if
                                         time_index < axes[1] else axes[1])
                         else:
                             values = vardata[...]
-                        multi_index = key
-                        if any(level_list):
-                            axes = (axes[0] + 1, axes[1] + 1, 0)
-                            multi_index = (key[0], key[1], level_list.index(lev))
                         if any(level_list) and "lev" in dst_vars[varname].dimensions:
-                            copy_xyz_block(time_slices[varname], values, multi_index, axes)
+                            zaxis = 0
+                            axes = (axes[0] + 1 if axes[0] >= 0 else axes[0], axes[1] + 1 if axes[1] else axes[1])
+                            multi_index = (key[0], key[1], level_list.index(lev))
                         else:
-                            copy_xy_block(time_slices[varname], values, multi_index, axes)
+                            zaxis = -1
+                            multi_index = key
+                        copy_block(time_slices[varname], values, multi_index, axes, zaxis)
         for varname, vardata in time_slices.items():
             if time_indices[varname] < 0 and i > 0:
                 continue
-            print varname, dst_vars[varname].shape, time_slices[varname].shape
+#            print varname, dst_vars[varname].shape, time_slices[varname].shape
             if time_indices[varname] == 0:
-                dst_vars[varname][istart:iend, :] = time_slices[varname]
+                if any(level_list):
+                    dst_vars[varname][istart:iend, :] = numpy.swapaxes(time_slices[varname], 0, 1)
+                else:
+                    dst_vars[varname][istart:iend, :] = time_slices[varname]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
     dst.close()
 
 
-def copy_xy_block(dest, src, key, axes):
+def copy_block(dest, src, key, xy_axes, z_axis):
     slices = []
+#    print "src shape:", src.shape, "dest shape:", dest.shape, "key:", key, "axes:", xy_axes
     for i in range(len(dest.shape)):
-        found_in_axes = False
-        for j in (0, 1):
-            if i == axes[j]:
-                slices.append(slice(key[j] * src.shape[i], (key[j] + 1) * src.shape[i], 1))
-                found_in_axes = True
-        if not found_in_axes:
-            slices.append(slice(0, dest.shape[i], 1))
-    dest[tuple(slices)] = src[...]
-
-
-def copy_xyz_block(dest, src, key, axes):
-    slices = []
-    for i in range(len(dest.shape)):
-        found_in_axes = False
-        for j in (0, 1, 2):
-            if i == axes[j]:
-                slices.append(slice(key[j] * src.shape[i], (key[j] + 1) * src.shape[i], 1))
-                found_in_axes = True
-        if not found_in_axes:
-            slices.append(slice(0, dest.shape[i], 1))
+        if i == xy_axes[0]:
+            j = i - 1 if 0 <= z_axis < i else i
+            slices.append(slice(key[0] * src.shape[j], (key[0] + 1) * src.shape[j], 1))
+        elif i == xy_axes[1]:
+            j = i - 1 if 0 <= z_axis < i else i
+            slices.append(slice(key[1] * src.shape[j], (key[1] + 1) * src.shape[j], 1))
+        elif i == z_axis:
+            slices.append(slice(key[2], key[2] + 1, 1))
+        else:
+            slices.append(slice(0, src.shape[i], 1))
     dest[tuple(slices)] = src[...]
 
 
@@ -187,9 +192,14 @@ def main():
     parser.add_argument("--exp", "-e", metavar="N", type=int, default=1, help="Experiment number (default: 001)")
     args = parser.parse_args()
     data_dir = args.datadir
-    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y')
-    build_xsec(dims1, dims2, levs, files)
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y')
+#    build_xsec(dims1, dims2, levs, files)
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'y', 'z')
+#    build_xsec(dims1, dims2, levs, files)
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'z')
+#    build_xsec(dims1, dims2, levs, files)
 
+logging.basicConfig(level=logging.DEBUG)
 
 if __name__ == "__main__":
     main()
