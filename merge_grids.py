@@ -5,6 +5,9 @@ import os
 import re
 import netCDF4
 import numpy
+import logging
+
+log = logging.getLogger(__name__)
 
 
 # TODO: if no experiment number given, just look for all...
@@ -88,6 +91,9 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
         dst_vars[name] = dst.createVariable(name, variable.datatype, variable.dimensions)
         dst_vars[name].setncatts(src.variables[name].__dict__)
         time_indices[name] = match_dim_character(name, variable, "time")
+        if time_indices[name] > 0:
+            log.error("Variable %s has non-major time index at %d... skipping variable" % (name, time_indices[name]))
+            continue
         if name != "time":
             shape = [dst_dims[d] for d in variable.dimensions if d in dst_dims]
             time_slices[name] = numpy.full(shape=shape, dtype=numpy.float64, fill_value=numpy.NaN)
@@ -97,6 +103,7 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
     chunk_size = 10
 
     for i in range(num_steps):  # loop over t
+        dst_vars["time"][i] = src.variables["time"][i]
         print "processing time step", i, "of", num_steps
         for j in dims2:  # loop over y
             for k in dims1:  # loop over x
@@ -105,7 +112,7 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
                 key = (k, j) if not any(level_list) else (k, j, level_list[0])
                 ds = datasets[key]
                 for varname, vardata in ds.variables.items():
-                    if varname == "time" or (time_indices[varname] < 0 and i > 0):
+                    if varname not in time_slices or (time_indices[varname] < 0 and i > 0):
                         continue
                     axes = (match_dim_character(varname, vardata, 'x'), match_dim_character(varname, vardata, 'y'))
                     if time_indices[varname] >= 0:
@@ -121,8 +128,6 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
                 dst_vars[varname][i, :] = time_slices[varname]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
-            else:
-                raise NotImplementedError("Time dimensions should come first")
         if i % chunk_size == 0:
             dst.sync()
     dst.close()
