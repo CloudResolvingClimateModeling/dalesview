@@ -11,6 +11,7 @@ import logging
 log = logging.getLogger(__name__)
 
 chunk_size = 10
+n_digits = 6
 
 def merge_files(data_dir, regex, output, expnr):
     file_info = find_files(data_dir, regex)
@@ -35,6 +36,7 @@ def find_files(data_dir, regex_str):
             for axis in axes:
                 if result.get(axis, None) is not None:
                     key.append(result[axis])
+            key = tuple(key)
             exp = result.get("exp", None)
             if exp is None:
                 log.warning("Could not detect experiment number for file %s...setting it to 001" % filepath)
@@ -49,17 +51,18 @@ def find_files(data_dir, regex_str):
         if not any(found_keys):
             key_values[exp] = []
         num_keys = len(found_keys[0])
-        key_values[exp] = [sorted(list(set([k[i] for k in found_keys]))) for i in range(num_keys)]
-        for key in itertools.product(*key_values):
+        key_vals = [sorted(list(set([k[i] for k in found_keys]))) for i in range(num_keys)]
+        key_values[exp] = key_vals
+        for key in itertools.product(*key_vals):
             if key not in found_keys:
                 missing_file = regex_str[1:-1]
                 for i in range(len(key)):
                     missing_file = missing_file.replace("(?P<" + axes[i] + ">\d+)", key[i])
-                missing_file.replace("(?P<exp>\d+)", exp)
+                missing_file = missing_file.replace("(?P<exp>\d+)", exp)
                 log.error("File not found: %s" % missing_file)
                 key_values[exp] = []
     result = {}
-    for exp, file_mapping in file_mappings:
+    for exp, file_mapping in file_mappings.items():
         key_vals = key_values.get(exp, [])
         if any(key_vals):
             new_mapping = {}
@@ -86,14 +89,20 @@ def match_dim_character(varname, ncvar, s):
 
 
 def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
+    
+    global chunk_size, n_digits
+
     dst = netCDF4.Dataset(output_file, 'w')
+    output = os.path.basename(output_file)
 
     # Copy attributes
     datasets, src = {}, None
-    for k in file_mapping.keys():
+    for k in sorted(file_mapping.keys()):
         datasets[k] = netCDF4.Dataset(file_mapping[k], 'r')
-        if src is None:
+        if src is None and len(datasets[k].dimensions.get("time",[])) > 0:
             src = datasets[k]
+    if src is None:
+        src = datasets[sorted(datasets.keys())[0]]
     dst.setncatts(src.__dict__)
 
     # Copy and extend spatial dimensions
@@ -131,7 +140,7 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
                 dims = ("lev",) + variable.dimensions[:]
         else:
             dims = variable.dimensions
-        dst_vars[name] = dst.createVariable(name, variable.datatype, dims)
+        dst_vars[name] = dst.createVariable(name, variable.datatype, dims, zlib=True, least_significant_digit=n_digits)
         dst_vars[name].setncatts(src.variables[name].__dict__)
         time_indices[name] = match_dim_character(name, variable, "time")
         if time_indices[name] > 0:
@@ -149,7 +158,7 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
     for i in range(0, num_steps, dt):  # loop over t
         istart, iend = i, min(i + dt, num_steps)
         dst_vars["time"][i:iend] = src.variables["time"][i:iend]
-        log.info("processing time step %d of %d...", i, num_steps)
+        log.info("processing time step %d of %d for output %s..." % (i, num_steps, output))
         levs = [-1] if not any(level_list) else level_list
         for lev in levs:  # loop over levels
             for j in dims2:  # loop over y
@@ -208,30 +217,35 @@ def copy_block(dest, src, key, xy_axes, z_axis):
 
 
 def main():
-    global chunk_size
+    global chunk_size, n_digits
     parser = argparse.ArgumentParser(description="Merge cross-section and field dump DALES output from parallel runs")
     parser.add_argument("--dir", metavar="DIR", type=str, default=".", help="Dales output (run) directory")
+    parser.add_argument("--odir", metavar="DIR", type=str, default=None, help="Script output directory, by default the run directory")
     parser.add_argument("--exp", "-e", metavar="N", type=int, default=-1, help="Experiment number (default: all)")
     parser.add_argument("--chunksize", metavar="N", type=int, default=10, help="Nr of time slices in memory")
+    parser.add_argument("--digits", metavar="N", type=int, default=6, help="Nr of siginificant digits in compressed output")
 
     args = parser.parse_args()
 
-    data_dir = args.datadir
+    data_dir = args.dir
     exp = args.exp
     chunk_size = max(args.chunksize, 1)
+    n_digits = max(args.digits, 1)
 
-    print "Searching 2d cross sections"
-    merge_files(data_dir, "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxy2d", exp)
-    merge_files(data_dir, "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossyz2d", exp)
-    merge_files(data_dir, "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxz2d", exp)
-    print "Searching 3d cross sections"
-    merge_files(data_dir, "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxy3d", exp)
-    merge_files(data_dir, "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossyz3d", exp)
-    merge_files(data_dir, "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxz3d", exp)
-    print "Searching surface fields"
-    merge_files(data_dir, "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "surf_xy", exp)
-    print "Searching 3d fields"
-    merge_files(data_dir, "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$", "fielddump", exp)
+    if args.odir is None:
+        outdir = data_dir
+    else:
+        outdir = args.odir
+        os.makedirs(outdir)
+
+    merge_files(data_dir, "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxy2d"), exp)
+    merge_files(data_dir, "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossyz2d"), exp)
+    merge_files(data_dir, "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxz2d"), exp)
+    merge_files(data_dir, "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxy3d"), exp)
+    merge_files(data_dir, "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossyz3d"), exp)
+    merge_files(data_dir, "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxz3d"), exp)
+    merge_files(data_dir, "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "surf_xy"), exp)
+    merge_files(data_dir, "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "fielddump"), exp)
 
 
 logging.basicConfig(level=logging.DEBUG)
