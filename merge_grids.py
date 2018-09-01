@@ -11,9 +11,9 @@ log = logging.getLogger(__name__)
 
 
 # TODO: if no experiment number given, just look for all...
-def find_xsec(data_dir, expnr, s1, s2):
-    regex2d = re.compile("^cross" + s1 + s2 + ".x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
-    regex3d = re.compile("^cross" + s1 + s2 + ".(\d+).x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
+def find_xsec(data_dir, expnr, s1, s2, basename):
+    regex2d = re.compile("^" + basename + s1 + s2 + ".x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
+    regex3d = re.compile("^" + basename + s1 + s2 + ".(\d+).x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
     file_mapping_2d, file_mapping_3d = {}, {}
     for filepath in os.listdir(data_dir):
         if re.match(regex2d, os.path.basename(filepath)):
@@ -32,7 +32,7 @@ def find_xsec(data_dir, expnr, s1, s2):
             for j in range(dims2):
                 for l in levs:
                     if (i, j, l) not in keys:
-                        f = '.'.join(["cross" + s1 + s2, str(l).zfill(4), str(i).zfill(3) + str(j).zfill(3),
+                        f = '.'.join([basename + s1 + s2, str(l).zfill(4), str(i).zfill(3) + str(j).zfill(3),
                                       str(expnr).zfill(3), "nc"])
                         raise Exception("Missing file: %s" % f)
         return range(dims1), range(dims2), levs, file_mapping_3d
@@ -42,7 +42,7 @@ def find_xsec(data_dir, expnr, s1, s2):
         for i in range(dims1):
             for j in range(dims2):
                 if (i, j) not in keys:
-                    f = '.'.join(["cross" + s1 + s2, str(i).zfill(3) + str(j).zfill(3), str(expnr).zfill(3), "nc"])
+                    f = '.'.join([basename + s1 + s2, str(i).zfill(3) + str(j).zfill(3), str(expnr).zfill(3), "nc"])
                     raise Exception("Missing file: %s" % f)
         return range(dims1), range(dims2), [], file_mapping_2d
     return [], [], [], {}
@@ -61,7 +61,7 @@ def match_dim_character(varname, ncvar, s):
 
 
 def build_xsec(dims1, dims2, level_list, file_mapping):
-    dst = netCDF4.Dataset("crossyz.nc", 'w')
+    dst = netCDF4.Dataset("out.nc", 'w')
 
     # Copy attributes
     datasets, src = {}, None
@@ -192,12 +192,14 @@ def main():
     parser.add_argument("--exp", "-e", metavar="N", type=int, default=1, help="Experiment number (default: 001)")
     args = parser.parse_args()
     data_dir = args.datadir
-#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y')
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y', "cross")
 #    build_xsec(dims1, dims2, levs, files)
-#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'y', 'z')
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'y', 'z', "cross")
 #    build_xsec(dims1, dims2, levs, files)
-#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'z')
+#    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'z', "cross")
 #    build_xsec(dims1, dims2, levs, files)
+    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y', "surf_")
+    build_xsec(dims1, dims2, levs, files)
 
 logging.basicConfig(level=logging.DEBUG)
 
