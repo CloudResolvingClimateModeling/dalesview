@@ -192,10 +192,11 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
             if time_indices[varname] < 0 and i > 0:
                 continue
             if time_indices[varname] == 0:
+                tlen = iend - istart
                 if any(level_list):
-                    dst_vars[varname][istart:iend, ...] = numpy.swapaxes(time_slices[varname], 0, 1)[istart:iend, ...]
+                    dst_vars[varname][istart:iend, ...] = numpy.swapaxes(time_slices[varname], 0, 1)[:tlen, ...]
                 else:
-                    dst_vars[varname][istart:iend, ...] = time_slices[varname][istart:iend, ...]
+                    dst_vars[varname][istart:iend, ...] = time_slices[varname][:tlen, ...]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
     dst.close()
@@ -252,10 +253,10 @@ def main():
                   "crossxz3d": "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "surf_xy": "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
-
     pool = multiprocessing.Pool(processes=n_procs)
     for ofile, regex in dalesfiles.items():
         pool.apply_async(merge_files, args=(data_dir, regex, os.path.join(outdir, ofile), exp))
+    pool.close()
     pool.join()
 
 
