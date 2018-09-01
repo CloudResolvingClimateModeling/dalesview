@@ -2,6 +2,7 @@
 
 import argparse
 import itertools
+import multiprocessing
 import os
 import re
 import netCDF4
@@ -12,6 +13,7 @@ log = logging.getLogger(__name__)
 
 chunk_size = 10
 n_digits = 6
+
 
 def merge_files(data_dir, regex, output, expnr):
     file_info = find_files(data_dir, regex)
@@ -89,7 +91,6 @@ def match_dim_character(varname, ncvar, s):
 
 
 def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
-    
     global chunk_size, n_digits
 
     dst = netCDF4.Dataset(output_file, 'w')
@@ -99,7 +100,7 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
     datasets, src = {}, None
     for k in sorted(file_mapping.keys()):
         datasets[k] = netCDF4.Dataset(file_mapping[k], 'r')
-        if src is None and len(datasets[k].dimensions.get("time",[])) > 0:
+        if src is None and len(datasets[k].dimensions.get("time", [])) > 0:
             src = datasets[k]
     if src is None:
         src = datasets[sorted(datasets.keys())[0]]
@@ -214,7 +215,6 @@ def copy_block(dest, src, key, xy_axes, z_axis):
         else:
             j = i - 1 if 0 <= z_axis < i else i
             slices.append(slice(0, src.shape[j], 1))
-    #print slices, dest.shape, src.shape
     dest[tuple(slices)] = src[...]
 
 
@@ -222,10 +222,13 @@ def main():
     global chunk_size, n_digits
     parser = argparse.ArgumentParser(description="Merge cross-section and field dump DALES output from parallel runs")
     parser.add_argument("--dir", metavar="DIR", type=str, default=".", help="Dales output (run) directory")
-    parser.add_argument("--odir", metavar="DIR", type=str, default=None, help="Script output directory, by default the run directory")
+    parser.add_argument("--odir", metavar="DIR", type=str, default=None,
+                        help="Script output directory, by default the run directory")
     parser.add_argument("--exp", "-e", metavar="N", type=int, default=-1, help="Experiment number (default: all)")
+    parser.add_argument("--np", "-j", metavar="N", type=int, default=4, help="Number of parallel processes")
     parser.add_argument("--chunksize", metavar="N", type=int, default=10, help="Nr of time slices in memory")
-    parser.add_argument("--digits", metavar="N", type=int, default=6, help="Nr of siginificant digits in compressed output")
+    parser.add_argument("--digits", metavar="N", type=int, default=6,
+                        help="Nr of siginificant digits in compressed output")
 
     args = parser.parse_args()
 
@@ -233,6 +236,7 @@ def main():
     exp = args.exp
     chunk_size = max(args.chunksize, 1)
     n_digits = max(args.digits, 1)
+    n_procs = args.np
 
     if args.odir is None:
         outdir = data_dir
@@ -240,14 +244,20 @@ def main():
         outdir = args.odir
         os.makedirs(outdir)
 
-    merge_files(data_dir, "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxy2d"), exp)
-    merge_files(data_dir, "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossyz2d"), exp)
-    merge_files(data_dir, "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxz2d"), exp)
-    merge_files(data_dir, "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxy3d"), exp)
-    merge_files(data_dir, "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossyz3d"), exp)
-    merge_files(data_dir, "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "crossxz3d"), exp)
-    merge_files(data_dir, "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "surf_xy"), exp)
-    merge_files(data_dir, "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$", os.path.join(outdir, "fielddump"), exp)
+    dalesfiles = {"crossxy2d": "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "crossyz2d": "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "crossxz2d": "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "crossxy3d": "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "crossyz3d": "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "crossxz3d": "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "surf_xy": "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
+
+    def process(ofile):
+        merge_files(data_dir, dalesfiles[ofile], os.path.join(outdir, ofile), exp)
+
+    pool = multiprocessing.Pool(processes=n_procs)
+    pool.map(process, dalesfiles.keys())
 
 
 logging.basicConfig(level=logging.DEBUG)
