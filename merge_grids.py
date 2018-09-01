@@ -10,62 +10,67 @@ import logging
 
 log = logging.getLogger(__name__)
 
+chunk_size = 10
 
-def find_files(data_dir, regex_str, axes):
+def merge_files(data_dir, regex, output, expnr):
+    file_info = find_files(data_dir, regex)
+    for exp, (keyvals, filemap) in file_info.items():
+        if 0 < expnr != int(exp):
+            continue
+        if any(filemap):
+            dims1 = keyvals[0]
+            dims2 = keyvals[1] if len(keyvals) > 1 else [1]
+            levs = keyvals[2] if len(keyvals) > 2 else []
+            glue_grids(dims1, dims2, levs, filemap, '.'.join([output, exp, "nc"]))
+
+
+def find_files(data_dir, regex_str):
     regex = re.compile(regex_str)
-    file_mapping = {}
+    axes = ("x", "y", "lev")
+    file_mappings = {}
     for filepath in os.listdir(data_dir):
         if re.match(regex, os.path.basename(filepath)):
-            result = re.search(regex, os.path.basename(filepath))
-            key = tuple([result.group(a) for a in axes])
-            file_mapping[key] = os.path.join(data_dir, filepath)
-    found_keys = file_mapping.keys()
-    key_values = [sorted(list(set([k[i] for k in found_keys]))) for i in range(len(axes))]
-    for key in itertools.product(*key_values):
-        if key not in found_keys:
-            numbers = tuple([str(key[axes[i] - 1]).zfill(3) for i in range(len(axes))])
-            log.error("Keys not found: %s" % str(numbers))
-            return [], {}
-    print "The key values are: ", key_values
-    return key_values, file_mapping
-
-
-# TODO: if no experiment number given, just look for all...
-def find_xsec(data_dir, expnr, s1, s2, basename):
-    regex2d = re.compile("^" + basename + s1 + s2 + ".x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
-    regex3d = re.compile("^" + basename + s1 + s2 + ".(\d+).x(\d+)y(\d+)." + str(expnr).zfill(3) + ".nc$")
-    file_mapping_2d, file_mapping_3d = {}, {}
-    for filepath in os.listdir(data_dir):
-        if re.match(regex2d, os.path.basename(filepath)):
-            result = re.search(regex2d, os.path.basename(filepath))
-            key = (int(result.group(1)), int(result.group(2)))
-            file_mapping_2d[key] = os.path.join(data_dir, filepath)
-        elif re.match(regex3d, os.path.basename(filepath)):
-            result = re.search(regex3d, os.path.basename(filepath))
-            key = (int(result.group(2)), int(result.group(3)), int(result.group(1)))
-            file_mapping_3d[key] = os.path.join(data_dir, filepath)
-    keys = file_mapping_3d.keys()
-    if any(keys):
-        dims1, dims2 = max([k[0] for k in keys]) + 1, max([k[1] for k in keys]) + 1
-        levs = sorted(list(set(k[2] for k in keys)))
-        for i in range(dims1):
-            for j in range(dims2):
-                for l in levs:
-                    if (i, j, l) not in keys:
-                        f = '.'.join([basename + s1 + s2, str(l).zfill(4), str(i).zfill(3) + str(j).zfill(3),
-                                      str(expnr).zfill(3), "nc"])
-                        raise Exception("Missing file: %s" % f)
-        return range(dims1), range(dims2), levs, file_mapping_3d
-    keys = file_mapping_2d.keys()
-    if any(keys):
-        dims1, dims2 = max([k[0] for k in keys]) + 1, max([k[1] for k in keys]) + 1
-        for i in range(dims1):
-            for j in range(dims2):
-                if (i, j) not in keys:
-                    f = '.'.join([basename + s1 + s2, str(i).zfill(3) + str(j).zfill(3), str(expnr).zfill(3), "nc"])
-                    raise Exception("Missing file: %s" % f)
-        return range(dims1), range(dims2), [], file_mapping_2d
-    return [], [], [], {}
+            result = re.search(regex, os.path.basename(filepath)).groupdict()
+            key = []
+            for axis in axes:
+                if result.get(axis, None) is not None:
+                    key.append(result[axis])
+            exp = result.get("exp", None)
+            if exp is None:
+                log.warning("Could not detect experiment number for file %s...setting it to 001" % filepath)
+                exp = "001"
+            if exp in file_mappings:
+                file_mappings[exp][key] = os.path.join(data_dir, filepath)
+            else:
+                file_mappings[exp] = {key: os.path.join(data_dir, filepath)}
+    key_values = {}
+    for exp, file_mapping in file_mappings.items():
+        found_keys = file_mapping.keys()
+        if not any(found_keys):
+            key_values[exp] = []
+        num_keys = len(found_keys[0])
+        key_values[exp] = [sorted(list(set([k[i] for k in found_keys]))) for i in range(num_keys)]
+        for key in itertools.product(*key_values):
+            if key not in found_keys:
+                missing_file = regex_str[1:-1]
+                for i in range(len(key)):
+                    missing_file = missing_file.replace("(?P<" + axes[i] + ">\d+)", key[i])
+                missing_file.replace("(?P<exp>\d+)", exp)
+                log.error("File not found: %s" % missing_file)
+                key_values[exp] = []
+    result = {}
+    for exp, file_mapping in file_mappings:
+        key_vals = key_values.get(exp, [])
+        if any(key_vals):
+            new_mapping = {}
+            for key, value in file_mapping.items():
+                new_key = tuple([int(s) for s in key])
+                new_mapping[new_key] = value
+            new_key_vals = []
+            for values_list in key_vals:
+                new_key_vals.append(sorted([int(s) for s in values_list]))
+            result[exp] = (new_key_vals, new_mapping)
+    return result
 
 
 def match_dim_character(varname, ncvar, s):
@@ -80,8 +85,8 @@ def match_dim_character(varname, ncvar, s):
     return index
 
 
-def build_xsec(dims1, dims2, level_list, file_mapping):
-    dst = netCDF4.Dataset("out.nc", 'w')
+def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
+    dst = netCDF4.Dataset(output_file, 'w')
 
     # Copy attributes
     datasets, src = {}, None
@@ -109,9 +114,9 @@ def build_xsec(dims1, dims2, level_list, file_mapping):
         levdim = dst.createDimension("lev", len(level_list))
         dst_dims["lev"] = len(levdim)
 
-    # num_steps = len(src.dimensions["time"])
-    num_steps = 100
-    dt = 10
+    num_steps = len(src.dimensions["time"])
+    num_steps = min(num_steps, len(src.dimensions["time"]))
+    dt = min(chunk_size, len(src.dimensions["time"]))
 
     # Copy variables
     if any(level_list):
@@ -203,32 +208,30 @@ def copy_block(dest, src, key, xy_axes, z_axis):
 
 
 def main():
+    global chunk_size
     parser = argparse.ArgumentParser(description="Merge cross-section and field dump DALES output from parallel runs")
-    parser.add_argument("datadir", metavar="DIR", type=str, help="Dales output (run) directory")
-    parser.add_argument("--exp", "-e", metavar="N", type=int, default=1, help="Experiment number (default: 001)")
+    parser.add_argument("--dir", metavar="DIR", type=str, default=".", help="Dales output (run) directory")
+    parser.add_argument("--exp", "-e", metavar="N", type=int, default=-1, help="Experiment number (default: all)")
+    parser.add_argument("--chunksize", metavar="N", type=int, default=10, help="Nr of time slices in memory")
+
     args = parser.parse_args()
+
     data_dir = args.datadir
-    #    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y', "cross")
-    #    build_xsec(dims1, dims2, levs, files)
-    #    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'y', 'z', "cross")
-    #    build_xsec(dims1, dims2, levs, files)
-    #    dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'z', "cross")
-    #    build_xsec(dims1, dims2, levs, files)
-    # dims1, dims2, levs, files = find_xsec(data_dir, args.exp, 'x', 'y', "surf_")
-    # build_xsec(dims1, dims2, levs, files)
+    exp = args.exp
+    chunk_size = max(args.chunksize, 1)
 
     print "Searching 2d cross sections"
-    regex = "^crossxy.x(\d+)y(\d+)." + str(args.exp).zfill(3) + ".nc$"
-    find_files(data_dir, regex, axes=(1, 2))
+    merge_files(data_dir, "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxy2d", exp)
+    merge_files(data_dir, "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossyz2d", exp)
+    merge_files(data_dir, "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxz2d", exp)
     print "Searching 3d cross sections"
-    regex = "^crossxy.(\d+).x(\d+)y(\d+)." + str(args.exp).zfill(3) + ".nc$"
-    find_files(data_dir, regex, axes=(3, 1, 2))
+    merge_files(data_dir, "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxy3d", exp)
+    merge_files(data_dir, "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossyz3d", exp)
+    merge_files(data_dir, "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "crossxz3d", exp)
     print "Searching surface fields"
-    regex = "^surf_xy.x(\d+)y(\d+)." + str(args.exp).zfill(3) + ".nc$"
-    find_files(data_dir, regex, axes=(1, 2))
+    merge_files(data_dir, "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$", "surf_xy", exp)
     print "Searching 3d fields"
-    regex = "^fielddump.(\d+).(\d+)." + str(args.exp).zfill(3) + ".nc$"
-    find_files(data_dir, regex, axes=(1, 2))
+    merge_files(data_dir, "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$", "fielddump", exp)
 
 
 logging.basicConfig(level=logging.DEBUG)
