@@ -253,11 +253,10 @@ def main():
                   "surf_xy": "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
 
-    def process(ofile):
-        merge_files(data_dir, dalesfiles[ofile], os.path.join(outdir, ofile), exp)
-
     pool = multiprocessing.Pool(processes=n_procs)
-    pool.map(process, dalesfiles.keys())
+    for ofile, regex in dalesfiles.items():
+        pool.apply_async(merge_files, args=(data_dir, regex, os.path.join(outdir, ofile), exp))
+    pool.join()
 
 
 logging.basicConfig(level=logging.DEBUG)
