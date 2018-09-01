@@ -192,9 +192,9 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
                 continue
             if time_indices[varname] == 0:
                 if any(level_list):
-                    dst_vars[varname][istart:iend, :] = numpy.swapaxes(time_slices[varname], 0, 1)
+                    dst_vars[varname][istart:iend, ...] = numpy.swapaxes(time_slices[varname], 0, 1)[istart:iend, ...]
                 else:
-                    dst_vars[varname][istart:iend, :] = time_slices[varname]
+                    dst_vars[varname][istart:iend, ...] = time_slices[varname][istart:iend, ...]
             elif time_indices[varname] < 0:
                 dst_vars[varname][:] = time_slices[varname]
     dst.close()
@@ -212,7 +212,9 @@ def copy_block(dest, src, key, xy_axes, z_axis):
         elif i == z_axis:
             slices.append(slice(key[2], key[2] + 1, 1))
         else:
-            slices.append(slice(0, src.shape[i], 1))
+            j = i - 1 if 0 <= z_axis < i else i
+            slices.append(slice(0, src.shape[j], 1))
+    #print slices, dest.shape, src.shape
     dest[tuple(slices)] = src[...]
 
 
