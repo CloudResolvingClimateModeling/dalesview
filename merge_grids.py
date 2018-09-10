@@ -116,7 +116,7 @@ def glue_grids(dims1, dims2, level_list, file_mapping, output_file):
             key = (i, j) if not any(level_list) else (i, j, level_list[0])
             ds = datasets[key]
             for name, dim in ds.dimensions.items():
-                if (i == 0 and name.startswith('x')) or (j == 0 and name.startswith('y')):
+                if (i == 0 and name.startswith('y')) or (j == 0 and name.startswith('x')):
                     dst_dims[name] += len(dim)
     for name, dim in src.dimensions.items():
         dst.createDimension(name, (dst_dims[name] if not dim.isunlimited() else None))
@@ -253,11 +253,16 @@ def main():
                   "crossxz3d": "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "surf_xy": "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
-    pool = multiprocessing.Pool(processes=n_procs)
-    for ofile, regex in dalesfiles.items():
-        pool.apply_async(merge_files, args=(data_dir, regex, os.path.join(outdir, ofile), exp))
-    pool.close()
-    pool.join()
+
+    if n_procs > 1:
+        pool = multiprocessing.Pool(processes=n_procs)
+        for ofile, regex in dalesfiles.items():
+            pool.apply_async(merge_files, args=(data_dir, regex, os.path.join(outdir, ofile), exp))
+        pool.close()
+        pool.join()
+    else:
+        for ofile, regex in dalesfiles.items():
+            merge_files(data_dir, regex, os.path.join(outdir, ofile), exp)
 
 
 logging.basicConfig(level=logging.DEBUG)
