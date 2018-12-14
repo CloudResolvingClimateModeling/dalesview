@@ -230,6 +230,8 @@ def main():
     parser.add_argument("--chunksize", metavar="N", type=int, default=10, help="Nr of time slices in memory")
     parser.add_argument("--digits", metavar="N", type=int, default=6,
                         help="Nr of siginificant digits in compressed output")
+    parser.add_argument("--cross", action="store_true", default=False,
+                        help="Process only cross sections")
 
     args = parser.parse_args()
 
@@ -254,6 +256,11 @@ def main():
                   "surf_xy": "^surf_xy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
 
+    if args.cross:
+        # if --cross given, process only cross-section fields
+        dalesfiles.pop('surf_xy')
+        dalesfiles.pop('fielddump')
+    
     if n_procs > 1:
         pool = multiprocessing.Pool(processes=n_procs)
         for ofile, regex in dalesfiles.items():
