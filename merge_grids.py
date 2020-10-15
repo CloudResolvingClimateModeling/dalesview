@@ -49,7 +49,7 @@ def find_files(data_dir, regex_str):
                 file_mappings[exp] = {key: os.path.join(data_dir, filepath)}
     key_values = {}
     for exp, file_mapping in file_mappings.items():
-        found_keys = file_mapping.keys()
+        found_keys = list(file_mapping.keys())
         if not any(found_keys):
             key_values[exp] = []
         num_keys = len(found_keys[0])
@@ -250,6 +250,7 @@ def main():
     dalesfiles = {"crossxy2d": "^crossxy.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "crossyz2d": "^crossyz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "crossxz2d": "^crossxz.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
+                  "cape2d": "^cape.x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "crossxy3d": "^crossxy.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "crossyz3d": "^crossyz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
                   "crossxz3d": "^crossxz.(?P<lev>\d+).x(?P<x>\d+)y(?P<y>\d+).(?P<exp>\d+).nc$",
@@ -260,7 +261,9 @@ def main():
         # if --cross given, process only cross-section fields
         dalesfiles.pop('surf_xy')
         dalesfiles.pop('fielddump')
-    
+
+    # Note: exceptions in the workers are silently ignored !
+    # Run with -np 1 to see exceptions
     if n_procs > 1:
         pool = multiprocessing.Pool(processes=n_procs)
         for ofile, regex in dalesfiles.items():
