@@ -12,10 +12,10 @@ or `python setup.py install`. It should automatically install the dependencies n
 For testing execute the example.py script on the test data. The package allows you to access the input and output data through python objects and plot them easily. E.g. if your run directory is `<rundir>` and experiment number is `<exp>`, you should be able to run
 ```
 $ python
->>> from dalesdata import DalesData
+>>> from dalesdata.dalesdata import DalesData
 >>> data = DalesData(<rundir>,<exp>)
 >>> print data # lists all available variables
->>> from dalesview import DalesView
+>>> from dalesview.dalesview import DalesView
 >>> view = DalesView(data)
 >>> view.plot(data.input)
 >>> view.plot("thl","tke")

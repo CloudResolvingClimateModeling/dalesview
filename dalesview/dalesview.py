@@ -43,7 +43,7 @@ class DalesView(object):
     @staticmethod
     def create_plot_api(backend_type):
         if backend_type == DalesView.mpl:
-            import mpl4dales
+            from . import mpl4dales
             return mpl4dales.Mpl4Dales()
         else:
             log.error("Plotting backend type %s is not known" % str(backend_type))

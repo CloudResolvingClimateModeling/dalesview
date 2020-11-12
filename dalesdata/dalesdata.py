@@ -1,8 +1,8 @@
 import os
 import glob
 import logging
-import dalesreader
-import dataslice
+from . import dalesreader
+from . import dataslice
 
 
 # Data objects for the DALES view package. The objects contain dictionaries for
