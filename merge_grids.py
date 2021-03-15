@@ -232,6 +232,8 @@ def main():
                         help="Nr of siginificant digits in compressed output")
     parser.add_argument("--cross", action="store_true", default=False,
                         help="Process only cross sections")
+    parser.add_argument("--fielddump", action="store_true", default=False,
+                        help="Process only 3D fielddumps")
 
     args = parser.parse_args()
 
@@ -261,6 +263,8 @@ def main():
         # if --cross given, process only cross-section fields
         dalesfiles.pop('surf_xy')
         dalesfiles.pop('fielddump')
+    if args.fielddump: # merge only 3d fielddumps
+        dalesfiles = {"fielddump": "^fielddump.(?P<x>\d+).(?P<y>\d+).(?P<exp>\d+).nc$"}
 
     # Note: exceptions in the workers are silently ignored !
     # Run with -np 1 to see exceptions
